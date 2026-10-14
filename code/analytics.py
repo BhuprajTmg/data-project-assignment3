@@ -6,7 +6,7 @@ import pandas as pd
 import statsmodels.api as sm
 from scipy import stats
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GroupShuffleSplit
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -103,9 +103,23 @@ def build_22(matches, teams):
 def fit_ols(data, features, target):
     X = data[features]
     y = data[target]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.20, random_state=SEED
-    )
+
+    if target == "goals":
+        splitter = GroupShuffleSplit(
+            n_splits=1,
+            test_size=0.20,
+            random_state=SEED
+        )
+        train_idx, test_idx = next(
+            splitter.split(X, y, groups=data["match_id"])
+        )
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.20, random_state=SEED
+        )
+
     X_tr = sm.add_constant(X_train)
     model = sm.OLS(y_train, X_tr).fit()
     X_te = sm.add_constant(X_test, has_constant="add")[X_tr.columns]
